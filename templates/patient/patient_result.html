@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Risk Result{% endblock %}
+{% block content %}
+<div class="card card-ghost mx-auto" style="max-width:760px;">
+  <div class="card-body">
+    <h4 class="card-title">Result for {{ disease }}</h4>
+
+    <p class="lead">Predicted risk: <strong>{{ risk|floatformat:4 }}</strong></p>
+    <p class="small text-muted">Threshold: {{ threshold }}</p>
+
+    {% if alert %}
+      <div class="alert alert-danger">
+        <h5 class="alert-heading">High risk detected</h5>
+        <p>This is a risk estimate, not a diagnosis. Please consult a licensed clinician as soon as possible.</p>
+      </div>
+    {% else %}
+      <div class="alert alert-success">
+        <strong>No high risk detected.</strong>
+        <p class="mb-0">If you have symptoms or concerns, please see a clinician.</p>
+      </div>
+    {% endif %}
+
+    <a href="{% url 'patient:patient_entry_self' %}" class="btn btn-outline-secondary mt-3">Run another check</a>
+  </div>
+</div>
+{% endblock %}

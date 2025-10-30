@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Doctor Dashboard{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between mb-3">
+  <h4>Patients</h4>
+  <!-- <form method="get" class="d-flex">
+    <input name="q" class="form-control me-2" placeholder="Search patients (name or ID)" value="{{ request.GET.q }}">
+    <button class="btn btn-outline-primary">Search</button>
+  </form> -->
+</div>
+
+<div class="card p-3">
+  <table class="table">
+    <thead><tr><th>Patient ID</th><th>Name</th><th>Birth</th><th></th></tr></thead>
+    <tbody>
+      {% for p in patients %}
+      <tr>
+        <td class="record-code">{{ p.identifier }}</td>
+        <td>{{ p.given }} {{ p.family }}</td>
+        <td>{{ p.birth_date|default:"-" }}</td>
+        <td>
+            <!-- <a class="btn btn-sm btn-primary" href="{% url 'patient:record_detail' p.id %}">View (patient view)</a> -->
+            <a class="btn btn-sm btn-outline-secondary" href="{% url 'patient:patient_detail' p.id %}">Open</a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="4" class="text-muted">No patients found.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

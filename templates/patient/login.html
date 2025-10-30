@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Login — Patient Portal{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-5 col-lg-4">
+    <div class="card card-ghost p-4">
+      <h4 class="mb-3">Patient login</h4>
+      <form method="post">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        <div class="mb-3">
+          <label class="form-label">Username</label>
+            {{ form.username }}
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Password</label>
+            {{ form.password }}
+        </div>
+        <button class="btn btn-primary w-100">Sign in</button>
+        <div class="text-center mt-3 small">
+          <a href="{% url 'patient:register' %}">Create account</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

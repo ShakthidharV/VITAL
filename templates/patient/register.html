@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Register — Patient Portal{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-7 col-lg-6">
+    <div class="card card-ghost p-4">
+      <h4 class="mb-3">Create your patient account</h4>
+      <form method="post" novalidate>
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label">First name</label>
+            {{ form.given }}
+          </div>
+          <div class="col-md-6 mb-3">
+            <label class="form-label">Last name</label>
+            {{ form.family }}
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Email</label>
+          {{ form.email }}
+          {% if form.email.errors %}<div class="text-danger small">{{ form.email.errors.0 }}</div>{% endif %}
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Password</label>
+          {{ form.password }}
+          {% if form.password.errors %}<div class="text-danger small">{{ form.password.errors.0 }}</div>{% endif %}
+          <div class="form-text">Minimum 8 characters</div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Phone</label>
+          {{ form.phone }}
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Address</label>
+          {{ form.address }}
+        </div>
+
+        <button class="btn btn-primary w-100">Create account</button>
+        <div class="text-center mt-3 small">
+          Already have an account? <a href="{% url 'patient:login' %}">Login</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

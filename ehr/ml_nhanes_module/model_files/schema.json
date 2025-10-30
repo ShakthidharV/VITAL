@@ -1,0 +1,42 @@
+{
+  "Diabetes": [
+    "Fasting Glucose (mg/dL)",
+    "Glycohemoglobin (%)",
+    "Triglyceride (mg/dL)",
+    "Direct HDL-Cholesterol (mg/dL)",
+    "Waist Circumference (cm)",
+    "Body Mass Index (kg/m2)",
+    "Systolic: Blood pressure (2nd reading) (mm Hg)"
+  ],
+  "Liver Condition": [
+    "Alanine aminotransferase (ALT) (U/L)",
+    "Aspartate aminotransferase (AST) (U/L)",
+    "Alkaline phosphatase (U/L)",
+    "Gamma-glutamyl transferase (GGT) (U/L)",
+    "Total bilirubin (mg/dL)",
+    "Body Mass Index (kg/m2)",
+    "Waist Circumference (cm)",
+    "Triglyceride (mg/dL)"
+  ],
+  "Weak/Failing Kidney": [
+    "Creatinine, serum (mg/dL)",
+    "Blood urea nitrogen (mg/dL)",
+    "Creatinine, urine (mg/dL)"
+  ],
+  "CVD": [
+    "Age at Screening (Adjudicated - Recode)",
+    "Gender",
+    "Systolic: Blood pressure (2nd reading) (mm Hg)",
+    "Diastolic: Blood pressure (2nd reading) (mm Hg)",
+    "Total Cholesterol (mg/dL)",
+    "Direct HDL-Cholesterol (mg/dL)",
+    "LDL-cholesterol (mg/dL)",
+    "Body Mass Index (kg/m2)"
+  ],
+  "cvd_components": [
+    "Ever told you had coronary heart disease",
+    "Ever told you had angina/angina pectoris",
+    "Ever told you had heart attack",
+    "Ever told you had a stroke"
+  ]
+}

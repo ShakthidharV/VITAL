@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Self Health Check{% endblock %}
+{% block content %}
+<div class="card card-ghost mx-auto" style="max-width:760px;">
+  <div class="card-body">
+    <h4 class="card-title mb-3">Self Health Check</h4>
+    <p class="text-muted small">Select a disease, enter the parameters and press <strong>Get my risk</strong>.</p>
+
+    <form id="patient-form" method="post" action="{% url 'patient:patient_submit_self' %}">
+      {% csrf_token %}
+      <div class="mb-3">
+        <label for="disease" class="form-label">Choose disease</label>
+        <select id="disease" name="disease" class="form-select">
+          {% for m in models %}
+            <option value="{{ m }}">{{ m }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div id="feature-fields" class="mb-3"></div>
+
+      {% if not patient %}
+        <div class="mb-3">
+          <label for="anon_id" class="form-label">Optional — email or phone (we hash it)</label>
+          <input id="anon_id" name="anon_id" class="form-control" placeholder="email or phone (optional)">
+        </div>
+      {% endif %}
+
+      <button class="btn btn-primary" type="submit">Get my risk</button>
+    </form>
+  </div>
+</div>
+
+<script>
+const schema = {{ schema_json|safe }};
+const diseaseSel = document.getElementById("disease");
+const container = document.getElementById("feature-fields");
+
+function buildFields(d) {
+  container.innerHTML = "";
+  (schema[d]||[]).forEach(f => {
+    const row = document.createElement("div");
+    row.className = "mb-2";
+    const label = document.createElement("label");
+    label.className = "form-label";
+    label.textContent = f;
+    const input = document.createElement("input");
+    input.name = f;
+    input.type = "text";
+    input.className = "form-control";
+    input.required = true;
+    row.appendChild(label);
+    row.appendChild(input);
+    container.appendChild(row);
+  });
+}
+
+diseaseSel.addEventListener("change", e => buildFields(e.target.value));
+buildFields(diseaseSel.value);
+</script>
+{% endblock %}
