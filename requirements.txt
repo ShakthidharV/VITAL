@@ -1,6 +1,7 @@
 asgiref==3.10.0
 dj-database-url==3.0.1
 Django==5.2.7
+django-heroku==0.3.1
 django-ratelimit==4.1.0
 djangorestframework==3.16.1
 djangorestframework_simplejwt==5.5.1
@@ -9,6 +10,7 @@ joblib==1.5.2
 numpy==2.3.4
 packaging==25.0
 pandas==2.3.3
+psycopg2==2.9.11
 psycopg2-binary==2.9.11
 PyJWT==2.10.1
 python-dateutil==2.9.0.post0
