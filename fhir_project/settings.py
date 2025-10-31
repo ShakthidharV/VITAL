@@ -188,7 +188,7 @@ REST_FRAMEWORK = {
 
 
 
-DEBUG = False
+DEBUG = True
 ALLOWED_HOSTS = ['*']
 
 # Static files
