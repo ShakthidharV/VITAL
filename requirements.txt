@@ -1,7 +1,7 @@
 asgiref==3.10.0
 dj-database-url==3.0.1
 Django==5.2.7
-django-on-heroku==1.1.2
+django-heroku==0.3.1
 django-ratelimit==4.1.0
 djangorestframework==3.16.1
 djangorestframework_simplejwt==5.5.1
