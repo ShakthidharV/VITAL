@@ -95,10 +95,6 @@ Application/
 ## Machine Learning Integration
 
 -   ML code and models are in `ehr/ml_nhanes_module/`.
--   To train models:
-    ```bash
-    python manage.py train_ml --csv ehr/merged_nhanes_readable.csv
-    ```
 -   Model artifacts are saved in `ehr/ml_nhanes_module/model_files/`.
 -   Prediction endpoint: `/ml/predict/` (see `ml_views.py` for API details).
 -   Supported diseases: Diabetes, Liver Condition, Weak/Failing Kidney, CVD (multi-label)
