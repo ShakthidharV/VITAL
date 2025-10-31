@@ -28,7 +28,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
 
 
 # Application definition
@@ -188,7 +187,6 @@ REST_FRAMEWORK = {
 
 
 
-DEBUG = True
 ALLOWED_HOSTS = ['*']
 
 # Static files
@@ -200,4 +198,22 @@ MIDDLEWARE.insert(1, "whitenoise.middleware.WhiteNoiseMiddleware")
 
 import django_heroku
 django_heroku.settings(locals())
+
+# Heroku requires these for correct host/origin handling
+CSRF_TRUSTED_ORIGINS = [
+    "https://vital-project-dee884d38375.herokuapp.com",
+]
+
+ALLOWED_HOSTS = [
+    "vital-project-dee884d38375.herokuapp.com",
+    "localhost",
+    "127.0.0.1",
+]
+
+# Fix SSL detection when running behind Heroku's proxy
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+# In production you should have DEBUG = False (use env var)
+# DEBUG = False
+
 
