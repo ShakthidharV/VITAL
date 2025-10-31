@@ -5,30 +5,33 @@ VITAL is a Django-based web application designed to provide a virtual interface 
 ---
 
 ## Table of Contents
-- [Features](#features)
-- [Project Structure](#project-structure)
-- [Setup Instructions](#setup-instructions)
-- [Running the Application](#running-the-application)
-- [Machine Learning Integration](#machine-learning-integration)
-- [Django App Modules](#django-app-modules)
-- [Static and Template Files](#static-and-template-files)
-- [Environment Variables](#environment-variables)
-- [Requirements](#requirements)
-- [License](#license)
+
+-   [Features](#features)
+-   [Project Structure](#project-structure)
+-   [Setup Instructions](#setup-instructions)
+-   [Running the Application](#running-the-application)
+-   [Machine Learning Integration](#machine-learning-integration)
+-   [Django App Modules](#django-app-modules)
+-   [Static and Template Files](#static-and-template-files)
+-   [Environment Variables](#environment-variables)
+-   [Requirements](#requirements)
+-   [License](#license)
 
 ---
 
 ## Features
-- User authentication for doctors and patients
-- Patient record management and observation entry
-- Machine learning risk prediction for chronic diseases (Diabetes, Liver, Kidney, CVD)
-- Admin dashboard and role-based access
-- FHIR-compliant project structure for interoperability
-- Modular, extensible codebase
+
+-   User authentication for doctors and patients
+-   Patient record management and observation entry
+-   Machine learning risk prediction for chronic diseases (Diabetes, Liver, Kidney, CVD)
+-   Admin dashboard and role-based access
+-   FHIR-compliant project structure for interoperability
+-   Modular, extensible codebase
 
 ---
 
 ## Project Structure
+
 ```
 Application/
 ├── db.sqlite3                # SQLite database (default)
@@ -50,93 +53,101 @@ Application/
 ---
 
 ## Setup Instructions
+
 1. **Clone the repository**
-   ```bash
-   git clone <repo-url>
-   cd Application
-   ```
+    ```bash
+    git clone <repo-url>
+    cd Application
+    ```
 2. **Create and activate a virtual environment**
-   ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate
-   ```
+    ```bash
+    python3 -m venv .venv
+    source .venv/bin/activate
+    ```
 3. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
+    ```bash
+    pip install -r requirements.txt
+    ```
 4. **Apply migrations**
-   ```bash
-   python manage.py migrate
-   ```
+    ```bash
+    python manage.py migrate
+    ```
 5. **Create a superuser (admin)**
-   ```bash
-   python manage.py createsuperuser
-   ```
+    ```bash
+    python manage.py createsuperuser
+    ```
 6. **(Optional) Load initial data**
-   - Place your data CSVs in the appropriate folders (see ML section).
+    - Place your data CSVs in the appropriate folders (see ML section).
 
 ---
 
 ## Running the Application
-- **Development server:**
-  ```bash
-  python manage.py runserver
-  ```
-- **Admin panel:**
-  Visit `http://localhost:8000/admin/` and log in with your superuser credentials.
+
+-   **Development server:**
+    ```bash
+    python manage.py runserver
+    ```
+-   **Admin panel:**
+    Visit `http://localhost:8000/admin/` and log in with your superuser credentials.
 
 ---
 
 ## Machine Learning Integration
-- ML code and models are in `ehr/ml_nhanes_module/`.
-- To train models:
-  ```bash
-  python manage.py train_ml --csv ehr/merged_nhanes_readable.csv
-  ```
-- Model artifacts are saved in `ehr/ml_nhanes_module/model_files/`.
-- Prediction endpoint: `/ml/predict/` (see `ml_views.py` for API details).
-- Supported diseases: Diabetes, Liver Condition, Weak/Failing Kidney, CVD (multi-label)
+
+-   ML code and models are in `ehr/ml_nhanes_module/`.
+-   To train models:
+    ```bash
+    python manage.py train_ml --csv ehr/merged_nhanes_readable.csv
+    ```
+-   Model artifacts are saved in `ehr/ml_nhanes_module/model_files/`.
+-   Prediction endpoint: `/ml/predict/` (see `ml_views.py` for API details).
+-   Supported diseases: Diabetes, Liver Condition, Weak/Failing Kidney, CVD (multi-label)
 
 ---
 
 ## Django App Modules
-- **ehr/**: Main app for EHR, ML, and business logic
-  - `models.py`: Patient, Practitioner, Observation, etc.
-  - `views.py`: Web views for dashboard, login, patient detail, etc.
-  - `ml_nhanes_module/`: ML training, prediction, and model files
-  - `serializers.py`: For API endpoints (if any)
-  - `forms.py`: Django forms for data entry
-  - `urls.py`: URL routing for the app
-- **fhir_project/**: Django project settings, root URLs, WSGI/ASGI
+
+-   **ehr/**: Main app for EHR, ML, and business logic
+    -   `models.py`: Patient, Practitioner, Observation, etc.
+    -   `views.py`: Web views for dashboard, login, patient detail, etc.
+    -   `ml_nhanes_module/`: ML training, prediction, and model files
+    -   `serializers.py`: For API endpoints (if any)
+    -   `forms.py`: Django forms for data entry
+    -   `urls.py`: URL routing for the app
+-   **fhir_project/**: Django project settings, root URLs, WSGI/ASGI
 
 ---
 
 ## Static and Template Files
-- **static/**: Custom static assets (images, CSS, JS)
-- **staticfiles/**: Collected static files for deployment
-- **templates/**: HTML templates for base, home, doctor, and patient views
-  - `base.html`, `home.html`, etc.
-  - `doctor/`, `patient/` subfolders for role-specific pages
+
+-   **static/**: Custom static assets (images, CSS, JS)
+-   **staticfiles/**: Collected static files for deployment
+-   **templates/**: HTML templates for base, home, doctor, and patient views
+    -   `base.html`, `home.html`, etc.
+    -   `doctor/`, `patient/` subfolders for role-specific pages
 
 ---
 
 ## Environment Variables
-- `.env` file (not committed) can be used to store secrets and configuration, e.g.:
-  ```env
-  SECRET_KEY=your-secret-key
-  DEBUG=True
-  DATABASE_URL=sqlite:///db.sqlite3
-  ```
+
+-   `.env` file (not committed) can be used to store secrets and configuration, e.g.:
+    ```env
+    SECRET_KEY=your-secret-key
+    DEBUG=True
+    DATABASE_URL=sqlite:///db.sqlite3
+    ```
 
 ---
 
 ## Requirements
-- Python 3.8+
-- Django 3.2+
-- pandas, scikit-learn, xgboost, seaborn (for ML)
-- gunicorn, dj-database-url, python-dotenv (for deployment)
+
+-   Python 3.8+
+-   Django 3.2+
+-   pandas, scikit-learn, xgboost, seaborn (for ML)
+-   gunicorn, dj-database-url, python-dotenv (for deployment)
 
 Install all dependencies with:
+
 ```bash
 pip install -r requirements.txt
 ```
@@ -144,9 +155,11 @@ pip install -r requirements.txt
 ---
 
 ## License
+
 This project is for academic and research purposes. See `LICENSE` if present.
 
 ---
 
 ## Contact
+
 For questions or contributions, please contact the project maintainer.
