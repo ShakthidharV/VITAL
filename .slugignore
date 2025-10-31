@@ -1,0 +1,14 @@
+# .slugignore (example)
+data/
+datasets/
+*.mp4
+*.zip
+tests/
+.devcontainer/
+.vscode/
+.env
+.venv/
+.DS_Store
+local_env/
+notebooks/
+docs/
