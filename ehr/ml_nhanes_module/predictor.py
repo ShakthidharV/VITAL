@@ -1,299 +1,196 @@
-# trainer.py (patched for XGBoost version compatibility, sparse OHE, and compressed joblib dumps)
-import os
-import json
-from pathlib import Path
 import joblib
-import pandas as pd
 import numpy as np
-from inspect import signature
+import pandas as pd
+from pathlib import Path
+import json
 
-from sklearn.compose import ColumnTransformer
-from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
-from sklearn.model_selection import train_test_split
+# optional: used only to detect sparse matrices
+try:
+    from scipy import sparse as _sparse
+except Exception:
+    _sparse = None
 
-import xgboost as xgb
-from sklearn.multiclass import OneVsRestClassifier
-
-# Constants + target keys
 MODEL_DIR = Path(__file__).parent / "model_files"
-MODEL_DIR.mkdir(exist_ok=True)
 SCHEMA_PATH = MODEL_DIR / "schema.json"
 
-# Keys exactly matching your notebook mapping
 DIABETES_KEY = "Diabetes"
 LIVER_KEY = "Liver Condition"
 KIDNEY_KEY = "Weak/Failing Kidney"
-CVD_KEY = "CVD"  # aggregated key for the multilabel CVD model
+CVD_KEY = "CVD"
 
-# original target column names used in your notebook
-TARGET_COLS = {
-    DIABETES_KEY: "Doctor told you have diabetes",
-    LIVER_KEY: "Ever told you had any liver condition",
-    KIDNEY_KEY: "Ever told you had weak/failing kidneys",
-}
-CVD_COMPONENTS = [
-    "Ever told you had coronary heart disease",
-    "Ever told you had angina/angina pectoris",
-    "Ever told you had heart attack",
-    "Ever told you had a stroke",
-]
+def _load_schema():
+    if not SCHEMA_PATH.exists():
+        return {}
+    return json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
 
+def list_models():
+    schema = _load_schema()
+    return [k for k in schema.keys() if k != "cvd_components"]
 
-def _save_schema(schema):
-    SCHEMA_PATH.write_text(json.dumps(schema, indent=2), encoding="utf-8")
+def get_expected_features(disease_key):
+    schema = _load_schema()
+    return schema.get(disease_key)
 
-
-def _onehot_encoder_sparse():
-    """
-    Return an OneHotEncoder configured to produce sparse output where supported.
-    Handles scikit-learn API differences between versions.
-    """
-    encoder_kwargs = {"handle_unknown": "ignore"}
-    sig = signature(OneHotEncoder)
-    if "sparse_output" in sig.parameters:
-        encoder_kwargs["sparse_output"] = True
-    elif "sparse" in sig.parameters:
-        # older versions use 'sparse' (True means sparse matrix)
-        encoder_kwargs["sparse"] = True
-    # else: rely on default behavior (usually sparse)
-    return OneHotEncoder(**encoder_kwargs)
-
-
-def _xgb_classifier_version_safe(**extra_params):
-    """
-    Return an XGBClassifier built in a way that is compatible with both XGBoost 1.x and 3.x:
-    - Only add use_label_encoder if the parameter exists in that version.
-    """
-    xgb_params = {"eval_metric": "logloss", "random_state": 42}
-    xgb_params.update(extra_params or {})
-    try:
-        # instantiate a dummy classifier to inspect supported params
-        dummy_params = xgb.XGBClassifier().get_params()
-        if "use_label_encoder" in dummy_params:
-            xgb_params["use_label_encoder"] = False
-    except Exception:
-        # if inspection fails, just omit use_label_encoder
-        pass
-    return xgb.XGBClassifier(**xgb_params)
-
-
-def _fit_and_save_single(df, disease_key, feature_list, target_col, estimator=None):
-    """
-    Fit preprocessing & model for a single binary label and save artifacts.
-    """
-    df_local = df.copy()
-    # keep rows where target is 1 or 2 then map 1->1,2->0 (per notebook)
-    df_local = df_local[df_local[target_col].isin([1, 2])].copy()
-    df_local[target_col] = df_local[target_col].map({1: 1, 2: 0})
-
-    # drop columns with >50% missing (except the required features)
-    miss_frac = df_local.isna().mean()
-    drop_cols = [c for c in df_local.columns if (miss_frac[c] > 0.5 and c not in feature_list)]
-    if drop_cols:
-        df_local = df_local.drop(columns=drop_cols)
-
-    # ensure feature_list present
-    feature_list = [f for f in feature_list if f in df_local.columns]
-    if not feature_list:
-        raise RuntimeError(f"No features found for disease {disease_key} in dataframe columns")
-
-    X = df_local[feature_list]
-    y = df_local[target_col].astype(int)
-
-    # split
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=y
-    )
-
-    # identify categorical vs numeric for ColumnTransformer
-    categorical_cols = [
-        c for c in X_train.columns if X_train[c].dtype == "object" or X_train[c].nunique() <= 10
-    ]
-    numeric_cols = [c for c in X_train.columns if c not in categorical_cols]
-
-    numeric_transformer = ("num", SimpleImputer(strategy="median"), numeric_cols)
-    # Use sparse OneHotEncoder when available to reduce memory/disk footprint
-    cat_transformer = ("cat", _onehot_encoder_sparse(), categorical_cols)
-
-    transformers = []
-    if numeric_cols:
-        transformers.append(numeric_transformer)
-    if categorical_cols:
-        transformers.append(cat_transformer)
-
-    preproc = ColumnTransformer(transformers=transformers, remainder="drop")
-
-    # fit preprocessing on train
-    preproc.fit(X_train)
-
-    X_train_t = preproc.transform(X_train)
-    X_test_t = preproc.transform(X_test)
-
-    # choose estimator (XGBoost by default) - version-safe
-    if estimator is None:
-        estimator = _xgb_classifier_version_safe()
-
-    estimator.fit(X_train_t, y_train)
-
-    # Save artifacts (compressed)
+def _load_artifacts_for(disease_key):
     base = MODEL_DIR / disease_key.replace(" ", "_")
-    base.parent.mkdir(parents=True, exist_ok=True)
     preproc_path = base.with_suffix(".preproc.joblib")
     model_path = base.with_suffix(".model.joblib")
+    if not preproc_path.exists() or not model_path.exists():
+        raise FileNotFoundError(f"Artifacts for '{disease_key}' not found in {MODEL_DIR}")
+    preproc = joblib.load(preproc_path)
+    model = joblib.load(model_path)
+    return preproc, model
 
-    # compress artifacts to reduce size on disk / slug
-    joblib.dump(preproc, preproc_path, compress=("lzma", 3), protocol=4)
-    joblib.dump(estimator, model_path, compress=("lzma", 3), protocol=4)
+# Helper utilities for robust prediction across versions/wrappers
+def _to_dense_if_needed(X):
+    # Convert sparse matrix to dense only if necessary / safe
+    if _sparse is not None and _sparse.issparse(X):
+        try:
+            return X.toarray()
+        except Exception:
+            return X
+    return X
 
-    return {
-        "preproc": str(preproc_path),
-        "model": str(model_path),
-        "features": feature_list,
-        "categorical": categorical_cols,
-        "numeric": numeric_cols,
-    }
-
-
-def _fit_and_save_cvd_multilabel(df, predefined_features, top_n=7, estimator=None):
+def _try_predict_proba(model, X):
     """
-    Simplified multilabel training: combine the 4 CVD targets, impute/encode features and
-    train OneVsRestClassifier with XGBoost as base estimator (default).
-    Saves a single preproc + multilabel model artifact.
+    Try to obtain probabilities from the model. Return a numpy array of shape (n_samples, n_classes)
+    or raise the last exception encountered.
     """
-    df_local = df.copy()
-    # mask rows where all cvd targets are in [1,2] per notebook
-    mask = df_local[CVD_COMPONENTS].apply(lambda col: col.isin([1, 2])).all(axis=1)
-    df_cvd = df_local.loc[mask].copy()
-    for t in CVD_COMPONENTS:
-        df_cvd[t] = df_cvd[t].map({1: 1, 2: 0})
+    X_try = _to_dense_if_needed(X)
+    last_exc = None
 
-    # drop high missing columns (except predefined_features)
-    miss_frac = df_cvd.isna().mean()
-    drop_cols = [c for c in df_cvd.columns if (miss_frac[c] > 0.5 and c not in predefined_features)]
-    if drop_cols:
-        df_cvd = df_cvd.drop(columns=drop_cols)
+    # 1) try predict_proba
+    if hasattr(model, "predict_proba"):
+        try:
+            probs = model.predict_proba(X_try)
+            return np.asarray(probs)
+        except Exception as e:
+            last_exc = e
 
-    # select features: we'll use predefined_features ∩ columns
-    feature_list = [f for f in predefined_features if f in df_cvd.columns]
-    if not feature_list:
-        raise RuntimeError("No predefined CVD features found in dataframe.")
+    # 2) try decision_function -> convert to probabilities
+    if hasattr(model, "decision_function"):
+        try:
+            df_val = model.decision_function(X_try)
+            df_val = np.asarray(df_val)
+            # binary case: 1D
+            if df_val.ndim == 1 or (df_val.ndim == 2 and df_val.shape[1] == 1):
+                df_flat = df_val.ravel()
+                p = 1.0 / (1.0 + np.exp(-df_flat))
+                return np.vstack([1 - p, p]).T
+            # multiclass: apply softmax row-wise
+            exp = np.exp(df_val - np.max(df_val, axis=1, keepdims=True))
+            probs = exp / exp.sum(axis=1, keepdims=True)
+            return probs
+        except Exception as e:
+            last_exc = e
 
-    X = df_cvd[feature_list]
-    y = df_cvd[CVD_COMPONENTS].astype(int)
+    # 3) try predict -> convert to 0/1 probabilities if possible
+    if hasattr(model, "predict"):
+        try:
+            preds = model.predict(X_try)
+            preds = np.asarray(preds)
+            # multilabel / multiclass predicted probabilities - return as-is if already float
+            if preds.dtype.kind in ("f",):
+                # already probabilities
+                if preds.ndim == 1:
+                    return np.vstack([1 - preds, preds]).T
+                return preds
+            # integer labels
+            if preds.ndim == 1:
+                # binary case -> build [1-p, p] with p in {0,1}
+                p = preds.astype(float)
+                return np.vstack([1 - p, p]).T
+            # multilabel (n_samples, n_classes) with 0/1 entries
+            return preds.astype(float)
+        except Exception as e:
+            last_exc = e
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=y
-    )
+    # If nothing worked, raise the last exception for visibility
+    if last_exc is not None:
+        raise last_exc
+    raise RuntimeError("No suitable prediction method found on model object.")
 
-    categorical_cols = [
-        c for c in X_train.columns if X_train[c].dtype == "object" or X_train[c].nunique() <= 10
-    ]
-    numeric_cols = [c for c in X_train.columns if c not in categorical_cols]
-
-    transformers = []
-    if numeric_cols:
-        transformers.append(("num", SimpleImputer(strategy="median"), numeric_cols))
-    if categorical_cols:
-        transformers.append(("cat", _onehot_encoder_sparse(), categorical_cols))
-
-    preproc = ColumnTransformer(transformers=transformers, remainder="drop")
-    preproc.fit(X_train)
-
-    X_train_t = preproc.transform(X_train)
-
-    if estimator is None:
-        base = _xgb_classifier_version_safe()
-        estimator = OneVsRestClassifier(base)
-
-    estimator.fit(X_train_t, y_train)
-
-    base_name = MODEL_DIR / CVD_KEY.replace(" ", "_")
-    preproc_path = base_name.with_suffix(".preproc.joblib")
-    model_path = base_name.with_suffix(".model.joblib")
-    joblib.dump(preproc, preproc_path, compress=("lzma", 3), protocol=4)
-    joblib.dump(estimator, model_path, compress=("lzma", 3), protocol=4)
-
-    return {
-        "preproc": str(preproc_path),
-        "model": str(model_path),
-        "features": feature_list,
-        "categorical": categorical_cols,
-        "numeric": numeric_cols,
-        "cvd_components": CVD_COMPONENTS,
-    }
-
-
-def train_and_save_all_models(csv_path="merged_nhanes_readable.csv"):
+def predict_risk(disease_key, features_dict):
     """
-    Main entrypoint:
-     - loads CSV (Windows-1252 encoding as in your notebook)
-     - trains the three single-label models with the predefined features from your notebook
-     - trains the multilabel CVD model with predefined features
-     - saves artifacts to model_files/
-     - writes schema.json describing expected features for runtime
+    Predict probability for disease_key.
+    - features_dict: {feature_name: value, ...} . All expected features must be present.
+    - Returns float in [0,1] (for single-label models) or a float summary for CVD (max over components).
     """
-    df = pd.read_csv(csv_path, encoding="Windows-1252")
-    schema = {}
+    schema = _load_schema()
+    if disease_key != CVD_KEY:
+        preproc, model = _load_artifacts_for(disease_key)
+        expected = schema.get(disease_key)
+        if expected is None:
+            raise KeyError(f"No schema for disease '{disease_key}'")
 
-    # predefined feature lists from your notebook (only keep those present in df)
-    predefined_feature_map = {
-        "Doctor told you have diabetes": [
-            "Fasting Glucose (mg/dL)",
-            "Glycohemoglobin (%)",
-            "Triglyceride (mg/dL)",
-            "Direct HDL-Cholesterol (mg/dL)",
-            "Waist Circumference (cm)",
-            "Body Mass Index (kg/m2)",
-            "Systolic: Blood pressure (2nd reading) (mm Hg)",
-        ],
-        "Ever told you had any liver condition": [
-            "Alanine aminotransferase (ALT) (U/L)",
-            "Aspartate aminotransferase (AST) (U/L)",
-            "Alkaline phosphatase (U/L)",
-            "Gamma-glutamyl transferase (GGT) (U/L)",
-            "Total bilirubin (mg/dL)",
-            "Body Mass Index (kg/m2)",
-            "Waist Circumference (cm)",
-            "Triglyceride (mg/dL)",
-        ],
-        "Ever told you had weak/failing kidneys": [
-            "Creatinine, serum (mg/dL)",
-            "Blood urea nitrogen (mg/dL)",
-            "Albumin, urine (µg/mL)",
-            "Creatinine, urine (mg/dL)",
-        ],
-    }
+        # Check all required features present
+        missing = [f for f in expected if f not in features_dict]
+        if missing:
+            raise KeyError(f"Missing features for {disease_key}: {missing}")
 
-    # Train single-label models
-    for target_col, disease_key in [
-        (TARGET_COLS[DIABETES_KEY], DIABETES_KEY),
-        (TARGET_COLS[LIVER_KEY], LIVER_KEY),
-        (TARGET_COLS[KIDNEY_KEY], KIDNEY_KEY),
-    ]:
-        # filter features present in df
-        predefined = [f for f in predefined_feature_map[target_col] if f in df.columns]
-        print(f"Training {disease_key} using features: {predefined}")
-        info = _fit_and_save_single(df, disease_key, predefined, target_col)
-        schema[disease_key] = info["features"]
+        # Build a single-row DataFrame with the exact column names used during fit
+        X_df = pd.DataFrame([{k: features_dict[k] for k in expected}], columns=expected)
 
-    # Train multilabel CVD
-    cvd_predefined = [
-        "Age at Screening (Adjudicated - Recode)",
-        "Gender",
-        "Systolic: Blood pressure (2nd reading) (mm Hg)",
-        "Diastolic: Blood pressure (2nd reading) (mm Hg)",
-        "Total Cholesterol (mg/dL)",
-        "Direct HDL-Cholesterol (mg/dL)",
-        "LDL-cholesterol (mg/dL)",
-        "Body Mass Index (kg/m2)",
-    ]
-    print(f"Training multi-label CVD using features: {cvd_predefined}")
-    info = _fit_and_save_cvd_multilabel(df, cvd_predefined)
-    schema[CVD_KEY] = info["features"]
-    # Also store the component mapping
-    schema["cvd_components"] = info.get("cvd_components", [])
+        # Transform and_predict probabilities robustly
+        X_t = preproc.transform(X_df)
 
-    _save_schema(schema)
-    print("Training complete. Artifacts and schema saved to:", MODEL_DIR)
-    return schema
+        try:
+            probs = _try_predict_proba(model, X_t)
+            # probs shape handling
+            probs = np.asarray(probs)
+            if probs.ndim == 1:
+                # treat as binary probability of positive class
+                p = float(np.clip(probs[0], 0.0, 1.0))
+                return p
+            if probs.shape[1] == 2:
+                return float(np.clip(probs[0, 1], 0.0, 1.0))
+            # multiclass -> pick class-1 probability? We'll return max-prob for "positive"
+            # but keep original behavior: if only one column, use that; else, pick second column if exists
+            if probs.shape[1] >= 2:
+                return float(np.clip(probs[0, 1], 0.0, 1.0))
+            # fallback: take max
+            return float(np.clip(np.max(probs[0]), 0.0, 1.0))
+        except Exception as e:
+            # bubble up as RuntimeError with context
+            raise RuntimeError(f"Prediction failed for '{disease_key}': {e}") from e
+
+    else:
+        # CVD multilabel case
+        preproc, model = _load_artifacts_for(CVD_KEY)
+        expected = schema.get(CVD_KEY)
+        components = schema.get("cvd_components", [])
+        if expected is None or not components:
+            raise RuntimeError("CVD schema or components missing")
+
+        missing = [f for f in expected if f not in features_dict]
+        if missing:
+            raise KeyError(f"Missing features for CVD: {missing}")
+
+        X_df = pd.DataFrame([{k: features_dict[k] for k in expected}], columns=expected)
+        X_t = preproc.transform(X_df)
+
+        try:
+            probs = _try_predict_proba(model, X_t)
+            probs = np.asarray(probs)
+            # If probs is 1D -> treat as single score (rare for multilabel)
+            if probs.ndim == 1:
+                return float(np.clip(probs[0], 0.0, 1.0))
+            # If model.predict_proba returned shape (n_samples, n_classes) for multilabel:
+            # ensure we have one row, then return maximum component probability (conservative).
+            if probs.ndim == 2:
+                # If shape is (1, n_components) -> ok
+                row = probs[0]
+                # If number of probs matches number of CVD components, use max
+                return float(np.clip(float(np.max(row)), 0.0, 1.0))
+            # fallback: try model.predict and aggregate
+        except Exception:
+            # fallback to direct predictions
+            try:
+                preds = model.predict(_to_dense_if_needed(X_t))
+                preds = np.asarray(preds)
+                if preds.ndim == 1:
+                    return float(np.clip(preds[0], 0.0, 1.0))
+                return float(np.clip(float(np.max(preds[0])), 0.0, 1.0))
+            except Exception as e:
+                raise RuntimeError(f"CVD prediction failed: {e}") from e
+
