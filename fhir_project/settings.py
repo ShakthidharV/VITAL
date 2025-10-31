@@ -198,3 +198,6 @@ STATIC_URL = '/static/'
 # Whitenoise
 MIDDLEWARE.insert(1, "whitenoise.middleware.WhiteNoiseMiddleware")
 
+import django_heroku
+django_heroku.settings(locals())
+
