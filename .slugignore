@@ -12,3 +12,4 @@ tests/
 local_env/
 notebooks/
 docs/
+model_files/
